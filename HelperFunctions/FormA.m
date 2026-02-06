@@ -1,4 +1,7 @@
-function A = FormA(ProblemSetup, sinogram)
+function A = FormA(ProblemSetup, restriction)
+    if numargs == 1
+        reduce = false;
+    end
     det_width = ProblemSetup.ssd_tsize;
     det_bins = ProblemSetup.tbins;
     ang_count = ProblemSetup.angle_count;
@@ -29,7 +32,7 @@ function A = FormA(ProblemSetup, sinogram)
 
         for det_idx = 1:det_bins
             % cum_val = sinogram(ang_idx, det_idx);
-            
+            row_id = det_idx + (ang_idx-1)*det_bins;
             % determine start, stop location
             det_loc_orig = detector_base_locations(det_idx,:);
             det_loc = [det_loc_orig(1)*cosA - det_loc_orig(2)*sinA, ...
@@ -45,7 +48,11 @@ function A = FormA(ProblemSetup, sinogram)
         end
     end
     A = sparse(rows, cols, vals, det_bins*ang_count, N*N);
-
+    if ~reduce
+        for kk = 1:size(A,1)
+            A(kk,:) = A(kk,:).*restriction;
+        end
+    end
 end
 
 

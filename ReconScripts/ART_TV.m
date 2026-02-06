@@ -7,7 +7,6 @@ function [recons] = ART_TV(ProblemSetup, pm_ARTTV)
     A                 = ProblemSetup.A;
     projections       = ProblemSetup.projections;
     N                 = ProblemSetup.N;
-    proj_order        = ProblemSetup.proj_order;
     
     %method specific variables
     iterations        = pm_ARTTV.Iterations;
@@ -16,12 +15,12 @@ function [recons] = ART_TV(ProblemSetup, pm_ARTTV)
     recon             = pm_ARTTV.initial(:);    % initialization
     alpha             = pm_ARTTV.alpha;         % dTV step size
     epsilon           = pm_ARTTV.epsilon;       % for calculating dTV
-        
+    lambda            = pm_ARTTV.lambda;
     norms = zeros(iterations,1);
     errors = zeros(iterations,1);
-    
+    proj_order = randperm(size(A,1));
     recons = zeros(N*N, iterations);
-figure;
+figure(1);
     for iter = 1:iterations
         prev_recon = recon;
 
@@ -33,8 +32,10 @@ figure;
             AiNorm = norm(Ai);
             if AiNorm>0
                 p = projections(proj_idx);
-                recon = recon + Ai*(p-Ai'*recon)/(AiNorm^2);
+                recon = recon + lambda*Ai*(p-Ai'*recon)/(AiNorm^2);
+                
             end
+            
         end
         
         % (C)-positivity step; calculate change (to initialize distance for grad
@@ -52,13 +53,15 @@ figure;
             v = dTV(recon,N,epsilon);
             v = v/norm(v);
             recon = recon-alpha*grad_desc_size*v;
+
         end
         
         recons(:, iter) = recon;
 
         % norms(iter) = norm(recon-prev_recon,2);
         % errors(iter) = norm(recon - img,2);
-imshow(full(reshape(recon,N,N))); pause(0.001);
+% imagesc(full(reshape(recon,N,N))); title(sprintf('%i, %i',iter,iterations)); pause(0.00001);
+proj_order = randperm(size(A,1));
     end
 end
 

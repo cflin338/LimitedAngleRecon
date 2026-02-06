@@ -18,42 +18,34 @@ end
 desired_angles = 1:ProblemSetup.angle_count;
 remove_angles = 60:120;
 angle_subset = desired_angles; desired_angles(remove_angles) = [];
-
+tic;
 A = FormA(ProblemSetup);
-
-% ProblemSetup.A = A;
+toc;
 
 % verification
 sinogram_slice_flat = sinogram_slice(:);
 
-% A_zerorows = 0;
-% proj_val = 0;
-% 
-% for ii = 1:size(A,1)
-%     if sum(A(ii,:))==0 && sinogram_slice_flat(ii)~=0
-%         A_zerorows = A_zerorows+1;
-%     elseif sum(A(ii,:))~=0 && sinogram_slice_flat(ii)==0
-%         proj_val = proj_val+1;
-%     end
-% end
-% disp([A_zerorows, proj_val])
-% 8
-% 23604       39412
-% 10
-% 15052       49255
-% figure(1);
-% for ii = 1:size(A,1)
-%     imshow(reshape(full(A(ii,:)),ProblemSetup.N,ProblemSetup.N));
-%     pause(0.000001);
-% end
+As = sum(A,2);
+disp(sum((As==0) & (sinogram_slice_flat>0)));
+
 ProblemSetup.projections = sinogram_slice_flat;
-ProblemSetup.proj_order = randperm(size(A,1));
 ProblemSetup.A = A;
 pm_ARTTV.Iterations = 10;
 pm_ARTTV.GradDescSteps = 30;
 pm_ARTTV.initial = zeros(ProblemSetup.N*ProblemSetup.N,1);
+pm_ARTTV.lambda = 1.1; %?? too big? 
 pm_ARTTV.alpha = 0.6;
 pm_ARTTV.epsilon = 0.1;
 
-ART_TV(ProblemSetup, pm_ARTTV)
+tic; recons = ART_TV(ProblemSetup, pm_ARTTV); toc;
     
+
+
+pm_ARTATV.initial = zeros(1, ProblemSetup.N*ProblemSetup.N);
+pm_ARTATV.N_tv = 20;
+pm_ARTATV.alphas = linspace(0,2*pi, 9); pm_ARTATV.alphas(end) = []; 
+        %use N_alpha=8, so 8 angles within valid scan range
+pm_ARTATV.iterations = 10;
+pm_ARTATV.epsilon = .1; 
+pm_ARTATV.lambda = .8;
+pm_ARTATV.a = 0.05;

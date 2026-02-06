@@ -4,77 +4,43 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
     %       SART + ATV
 
     % General Variables
-    projections         = ProblemSetup.projections;
-    N                   = ProblemSetup.ReconImgSize;
-    b                   = ProblemSetup.sinogram;
-    
-    bins = ProblemSetup.bins;
-    num_angles = length(ProblemSetup.angles);
-
-    projections_full = ProblemSetup.projections_full;
-    fullOrderRandom = randperm(length(projections_full));
-
-    A_subsets = cell(1,num_angles);
-    b_subsets = cell(1,num_angles);
-    W_subsets = cell(1,num_angles);
-    V_subsets = cell(1,num_angles);
-    
-    recons = zeros(iterations, N*N);
-    for ang_idx = 1:num_angles
-        rows_selected = (ang_idx-1)*bins+1:(ang_idx-1)*bins+bins;
-            A_sub = A_Full(rows_selected,:);
-            b_sub = projections_full(rows_selected);
-
-            toRemove = sum(A_sub,2) == 0;
-
-            W_sub = sum(A_sub,2);
-            V_sub = sum(A_sub,1);
-            
-            D = 1./W_sub; D(isinf(D)) = 0; W_sub = sparse(diag(D));
-            M = 1./V_sub; M(isinf(M)) = 0; V_sub = sparse(diag(M));
-
-            A_subsets{ang_idx} = A_sub;
-            b_subsets{ang_idx} = b_sub;
-            W_subsets{ang_idx} = W_sub;
-            V_subsets{ang_idx} = V_sub;
-    end
-    AngleOrder = randperm(num_angles);
-    
-    img               = ProblemSetup.img;
+    A                 = ProblemSetup.A;
+    projections       = ProblemSetup.projections;
     N                 = ProblemSetup.N;
-    proj_order        = ProblemSetup.proj_order;
-    % variables for monitoring
-    visualize         = pm_ARTATV.visualize;
-    disp_prog         = pm_ARTATV.disp_prog;
-    sample_rate       = pm_ARTATV.sample_rate;
+    thetas            = ProblemSetup.angles; %angles
+    bins              = ProblemSetup.tbins;
+    num_angles        = length(ProblemSetup.angles);
     
     % method specific variables
-    iterations        = pm_ARTATV.iterations;
     recon             = pm_ARTATV.initial;
     N_tv              = pm_ARTATV.N_tv;
     alphas            = pm_ARTATV.alphas;
-    
+    iterations        = pm_ARTATV.iterations;
     epsilon           = pm_ARTATV.epsilon;
     lambda            = pm_ARTATV.lambda;
     alpha             = pm_ARTATV.alpha;  %TV directions
-    thetas            = pm_ARTATV.thetas; %angles
-       
-    norms = zeros(iterations,1);
-    errors = zeros(iterations,1);
-    samples        = [];
-    submetrics = ProblemSetup.empty_sub;
-    submetric_keys = fieldnames(submetrics); % will be used for updating metrics
-    overallmetrics    = [];
-    % helper
-    if visualize
-        fig_rows = 1;
-        fig_cols = 3;
-        figure(); set(gcf, 'units', 'normalized', 'outerposition', [0.25 0.25 .5 .5]);
-        tiledlayout(fig_rows,fig_cols);
+
+    subA = cell(1,num_angles);
+    subP = cell(1,num_angles);
+    subV = cell(1,num_angles);
+    subW = cell(1,num_angles);
+
+    for ang = 1:num_angles
+        tmpA = A((ang-1)*bins+1:ang*bins,:);
+        subA{ang} = tmpA((ang-1)*bins+1:ang*bins);
+        subP{ang} = projections((ang-1)*bins+1:ang*bins);
+        tmpV = sum(tmpA,1); tmpV = 1./tmpV; tmpV(isinf(tmpV)) = 0; tmpV = spdiags(tmpV); 
+        subV{ang} = tmpV;
+        tmpW = sum(tmpA,2); tmpW = 1./tmpW; tmpW(isinf(tmpW)) = 0; tmpW = spdiags(tmpW); 
+        subW{ang} = tmpW;
+
     end
-    if disp_prog
-        wb = waitbar(0, 'Iterating...'); 
-    end
+    
+    
+    recons = zeros(iterations, N*N);
+
+    AngleOrder        = randperm(num_angles);
+    
     D = sum(A,1); D = 1./D; D(isinf(D)) = 0; D = diag(D);
     M = sum(A,2); M = 1./M; M(isinf(M)) = 0; M = diag(M);
     
@@ -89,21 +55,17 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
 
         for angle_idx = 1:num_angles
             subset = AngleOrder(angle_idx);
-            A_sub = A_subsets{subset};
-            b_sub = b_subsets{subset};
-            W_sub = W_subsets{subset};
-            V_sub = V_subsets{subset};
+            A_sub = subA{subset};
+            b_sub = subP{subset};
+            W_sub = subW{subset};
+            V_sub = subV{subset};
             recon = recon + lambda * V_sub * A_sub' * W_sub * (b_sub - A_sub * recon);
             recon(recon<0) = 0;
         end
-
-        post_sart = recon;
-
-        post_art_recon = recon;
         
         % ATV gradient descent
         d = norm(recon-prev_recon,2);
-%         
+         
         for n = 1:N_tv
             % gradient of ATV cost function
             [~,dtv] = grad_ATV(recon, thetas, alphas); %this is humphry's implementation
@@ -111,20 +73,13 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
             recon = recon - alpha * d * dtv;
         end
 
-        iteration_end_d = norm(recon-prev_recon,'fro')/sqrt(numel(recon));
-        
-        norms(iter) = iteration_end_d;
-        errors(iter) = norm(recon - img);
-
-        if iteration_end_d<epsilon
-            break;
-        end
-        
+        AngleOrder        = randperm(num_angles);
     end
 
     if disp_prog
         close(wb);
     end
+    
 end
 
 
