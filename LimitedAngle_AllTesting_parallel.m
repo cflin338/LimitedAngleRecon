@@ -41,11 +41,11 @@ tic; recons = ART_TV(ProblemSetup, pm_ARTTV); toc;
     
 
 
-pm_ARTATV.initial = zeros(1, ProblemSetup.N*ProblemSetup.N);
-pm_ARTATV.N_tv = 20;
-pm_ARTATV.alphas = linspace(0,2*pi, 9); pm_ARTATV.alphas(end) = []; 
-        %use N_alpha=8, so 8 angles within valid scan range
-pm_ARTATV.iterations = 10;
-pm_ARTATV.epsilon = .1; 
-pm_ARTATV.lambda = .8;
-pm_ARTATV.a = 0.05;
+% pm_ARTATV.initial = zeros(1, ProblemSetup.N*ProblemSetup.N);
+% pm_ARTATV.N_tv = 20;
+% pm_ARTATV.alphas = linspace(0,2*pi, 9); pm_ARTATV.alphas(end) = []; 
+%         %use N_alpha=8, so 8 angles within valid scan range
+% pm_ARTATV.iterations = 10;
+% pm_ARTATV.epsilon = .1; 
+% pm_ARTATV.lambda = .8;
+% pm_ARTATV.a = 0.05;

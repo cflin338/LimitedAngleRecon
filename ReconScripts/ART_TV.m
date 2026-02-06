@@ -60,7 +60,7 @@ figure(1);
 
         % norms(iter) = norm(recon-prev_recon,2);
         % errors(iter) = norm(recon - img,2);
-% imagesc(full(reshape(recon,N,N))); title(sprintf('%i, %i',iter,iterations)); pause(0.00001);
+imagesc(full(reshape(recon,N,N))); title(sprintf('%i, %i',iter,iterations)); pause(0.00001);
 proj_order = randperm(size(A,1));
     end
 end
