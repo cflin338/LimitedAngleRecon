@@ -8,7 +8,8 @@ run("LoadProblemSetup.m")
 
 [sinogram,sinogram_slice] = read_pct_sinogram('data/pct_sinogram.txt', ...
     ProblemSetup.vbins, ProblemSetup.tbins, ProblemSetup.angle_count, ProblemSetup.target_slice);
-
+% % hull = findHull(sinogram, angles);
+hull = FindHull(sinogram, projections, 100);
 if size(sinogram,1)~=ProblemSetup.angle_count * ProblemSetup.vbins || ...
         size(sinogram,2)~=ProblemSetup.tbins
     disp('mismatch of sinogram')
@@ -33,7 +34,7 @@ ProblemSetup.A = A;
 pm_ARTTV.Iterations = 10;
 pm_ARTTV.GradDescSteps = 30;
 pm_ARTTV.initial = zeros(ProblemSetup.N*ProblemSetup.N,1);
-pm_ARTTV.lambda = 1.1; %?? too big? 
+pm_ARTTV.lambda = 2; %?? too big? 
 pm_ARTTV.alpha = 0.6;
 pm_ARTTV.epsilon = 0.1;
 

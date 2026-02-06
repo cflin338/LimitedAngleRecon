@@ -1,5 +1,5 @@
 function A = FormA(ProblemSetup, restriction)
-    if numargs == 1
+    if nargin == 1
         reduce = false;
     end
     det_width = ProblemSetup.ssd_tsize;
