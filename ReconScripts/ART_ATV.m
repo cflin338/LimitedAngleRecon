@@ -1,33 +1,31 @@
-function [recon,metrics,samples] = ART_ATV(ProblemSetup, pm_ARTATV)
+function recons = ART_ATV(ProblemSetup, pm_ARTATV)
     % A limited-angle CT reconstruction method based on anisotropic TV minimization
     %       Zhiqiang Chen 2013
     %       SART + ATV
 
     % General Variables
-    A                 = ProblemSetup.A;
-    projections       = ProblemSetup.projections;
-    bins = ProblemSetup.bins;
+    projections         = ProblemSetup.projections;
+    N                   = ProblemSetup.ReconImgSize;
+    b                   = ProblemSetup.sinogram;
+
     num_angles = length(ProblemSetup.angles);
 
-    A_Full = ProblemSetup.A_full;
     projections_full = ProblemSetup.projections_full;
     fullOrderRandom = randperm(length(projections_full));
-% 
+
     A_subsets = cell(1,num_angles);
     b_subsets = cell(1,num_angles);
     W_subsets = cell(1,num_angles);
     V_subsets = cell(1,num_angles);
-% 
-%     
+    
+    recons = zeros(iterations, N*N);
     for ang_idx = 1:num_angles
         rows_selected = (ang_idx-1)*bins+1:(ang_idx-1)*bins+bins;
             A_sub = A_Full(rows_selected,:);
             b_sub = projections_full(rows_selected);
 
             toRemove = sum(A_sub,2) == 0;
-            
-%             A_sub(toRemove, : ) = [];
-%             b_sub(toRemove) = [];
+
             W_sub = sum(A_sub,2);
             V_sub = sum(A_sub,1);
             
@@ -87,12 +85,6 @@ function [recon,metrics,samples] = ART_ATV(ProblemSetup, pm_ARTATV)
                                                  iter, iterations));
         end
         prev_recon = recon;
-        %% SART step
-        % SART update: recon = recon + w inv(V) A' inv(W) (b-A*recon)
-%         recon = recon + lambda * (A' * ((projections - A*recon) ./ W)) ./ V';
-        % when doing the above SART with missing angles (shifted by 90),
-        %       get psnr of 25.665
-%         recon = recon + lambda * D * A' * M * (projections - A * recon);
 
         for angle_idx = 1:num_angles
             subset = AngleOrder(angle_idx);
@@ -103,22 +95,7 @@ function [recon,metrics,samples] = ART_ATV(ProblemSetup, pm_ARTATV)
             recon = recon + lambda * V_sub * A_sub' * W_sub * (b_sub - A_sub * recon);
             recon(recon<0) = 0;
         end
-%%         ART IMPLEMENTATION
-% ART update-old (incorrect) implementation; results in psnr of 47.7671,
-% using missing angles (shifted by 90)
-%         for idx = 1:length(projections)
-%             proj_idx = proj_order(idx);
-%             Ai = A(proj_idx,:);
-%             c = Ai * recon; 
-%             numer = projections(proj_idx) - c;
-%             denom = norm(Ai)^2 ;
-%             update = (lambda * numer / denom)' * Ai';
-%             recon = recon + update;
-%         
-%             recon(recon<0) = 0;
-%         
-%         end
-%%
+
         post_sart = recon;
 
         post_art_recon = recon;
@@ -133,57 +110,17 @@ function [recon,metrics,samples] = ART_ATV(ProblemSetup, pm_ARTATV)
             recon = recon - alpha * d * dtv;
         end
 
-        % original exit condition
-%         iteration_end_d = norm(prev_reconstruction-reconstruction,2);
-        % % this is exit conditionused in L1dL2, tolerance 1e-5
         iteration_end_d = norm(recon-prev_recon,'fro')/sqrt(numel(recon));
         
-        d = norm(recon-post_art_recon); %this looks at norm change due to aTV reduction
         norms(iter) = iteration_end_d;
         errors(iter) = norm(recon - img);
-        
-        disp([norm(post_sart - img), errors(iter)])
-        
-        if mod(iter, sample_rate)==0
-            samples = [samples; recon(:)'];
-        end
-        if visualize
-            nexttile(1);
-            imshow(reshape(post_sart,[N,N]),[], 'InitialMagnification', 'fit'); 
-            nexttile(2);
-            imshow(reshape(recon,[N,N]),[], 'InitialMagnification', 'fit'); 
-            title('POCSATV-Recon post ATV step')
-            nexttile(3);
-            
-            yyaxis left
-            plot(norms(norms>0), 'b'); 
-            ylabel('Exit Criteria (Change)');
-        
-            yyaxis right
-            plot(errors(errors>0), 'r--'); 
-            ylabel('Error');
-        
-            xlabel('Iterations');
-            title('Exit Criteria and Error of Reconstruction by Iteration'); 
-            pause(.0000001);
-            
-        end
-        [sub, overall] = localized_metric_v2(reshape(img,[N,N]), reshape(recon,[N,N]), ...
-                                             ProblemSetup);
-        % 8 total fields, submetrics
-        for i = 1:length(submetric_keys)
-            submetrics.(submetric_keys{i}) = [submetrics.(submetric_keys{i}); ...
-                                                sub.(submetric_keys{i})];
-        end
 
-        overallmetrics = [overallmetrics; overall];
         if iteration_end_d<epsilon
             break;
         end
         
     end
-    metrics.sub = submetrics;
-    metrics.full = overallmetrics;
+
     if disp_prog
         close(wb);
     end
@@ -340,7 +277,6 @@ function v = dATV_chen(f, n, alphas, weights,epsilon)
     end
     v = v(:);
 end
-
 
 function v = dATV_Jin(f, n, angles, weights, epsilon)
 % this is from this paper: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=5874180

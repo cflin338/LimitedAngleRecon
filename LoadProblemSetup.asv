@@ -1,0 +1,8 @@
+% loading in generic variables 
+seed = 1; rng(seed); 
+
+vsize = 24; tsize=350; angle_count=360;
+ssd_tsize = 35;
+ssd_vsize = 6;
+recon_c
+

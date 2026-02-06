@@ -1,0 +1,89 @@
+function [recons] = ART_TV(ProblemSetup, pm_ARTTV)
+    % Accurate image reconstruction from few-views and limited-angle  data in divergent-beam CT
+    %       Emil Sidky 2009
+    % TV Paper
+    % 
+    % General Variables
+    A                 = ProblemSetup.A;
+    projections       = ProblemSetup.projections;
+    N                 = ProblemSetup.N;
+    proj_order        = ProblemSetup.proj_order;
+    
+    %method specific variables
+    iterations        = pm_ARTTV.Iterations;
+    NData             = size(A,1); 
+    GradDescSteps     = pm_ARTTV.GradDescSteps; % number of TV steps
+    recon             = pm_ARTTV.initial(:);    % initialization
+    alpha             = pm_ARTTV.alpha;         % dTV step size
+    epsilon           = pm_ARTTV.epsilon;       % for calculating dTV
+        
+    norms = zeros(iterations,1);
+    errors = zeros(iterations,1);
+    
+    recons = zeros(N*N, iterations);
+figure;
+    for iter = 1:iterations
+        prev_recon = recon;
+
+        % (B) data projection steps
+        for m = 1:NData
+            proj_idx = proj_order(m);
+            % basis vector
+            Ai = A(proj_idx,:)';
+            AiNorm = norm(Ai);
+            if AiNorm>0
+                p = projections(proj_idx);
+                recon = recon + Ai*(p-Ai'*recon)/(AiNorm^2);
+            end
+        end
+        
+        % (C)-positivity step; calculate change (to initialize distance for grad
+        %           desc step
+        recon(recon<0)=0;
+        
+        % (D)-tv gradient descent initialization
+        grad_desc_size = norm(recon-prev_recon,2);
+        % original exit condition
+        % curr_dist = norm(reconstruction-prev_reconstruction,2);
+        % curr_dist = norm(recon-prev_recon,'fro')/sqrt(numel(recon));
+        
+        % (D')grad descent
+        for m = 1:GradDescSteps
+            v = dTV(recon,N,epsilon);
+            v = v/norm(v);
+            recon = recon-alpha*grad_desc_size*v;
+        end
+        
+        recons(:, iter) = recon;
+
+        % norms(iter) = norm(recon-prev_recon,2);
+        % errors(iter) = norm(recon - img,2);
+imshow(full(reshape(recon,N,N))); pause(0.001);
+    end
+end
+
+function v = dTV(f, n, epsilon)
+    % gradient of TV cost function, from paper
+    f = reshape(f, [n,n]);
+    v = zeros(n,n);
+    for s = 2:size(f,1)-1
+        for t = 2:size(f,2)-1
+            v(s,t) = (2*(f(s,t)-f(s-1,t))+2*(f(s,t)-f(s,t-1))) / ...
+                    sqrt(epsilon + (f(s,t)-f(s-1,t))^2+(f(s,t)-f(s,t-1))^2) - ...
+                    2*(f(s+1,t)-f(s,t))/sqrt(epsilon+(f(s+1,t)-f(s,t))^2+(f(s+1,t)-f(s+1,t-1))^2) - ...
+                    2*(f(s,t+1)-f(s,t))/sqrt(epsilon+(f(s,t+1)-f(s,t))^2+(f(s,t+1)-f(s-1,t+1))^2);
+        end
+    end
+    v = v(:);
+end
+
+function n = tv_norm(f, bins)
+    % Discrete TV norm, from paper
+    n = 0;
+    f = reshape(f,[bins,bins]);
+    for i = 2:bins
+        for j = 2:bins
+            n = n + sqrt((f(i,j)-f(i-1,j))^2+(f(i,j)-f(i,j-1))^2);
+        end
+    end
+end
