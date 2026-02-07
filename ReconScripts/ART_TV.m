@@ -7,7 +7,7 @@ function [recons] = ART_TV(ProblemSetup, pm_ARTTV)
     A                 = ProblemSetup.A;
     projections       = ProblemSetup.projections;
     N                 = ProblemSetup.N;
-    
+    hull = ProblemSetup.hull(:)';
     %method specific variables
     iterations        = pm_ARTTV.Iterations;
     NData             = size(A,1); 
@@ -16,6 +16,7 @@ function [recons] = ART_TV(ProblemSetup, pm_ARTTV)
     alpha             = pm_ARTTV.alpha;         % dTV step size
     epsilon           = pm_ARTTV.epsilon;       % for calculating dTV
     lambda            = pm_ARTTV.lambda;
+
     norms = zeros(iterations,1);
     errors = zeros(iterations,1);
     proj_order = randperm(size(A,1));
@@ -28,7 +29,7 @@ figure(1);
         for m = 1:NData
             proj_idx = proj_order(m);
             % basis vector
-            Ai = A(proj_idx,:)';
+            Ai = A(proj_idx,:)'.*hull';
             AiNorm = norm(Ai);
             if AiNorm>0
                 p = projections(proj_idx);
@@ -60,7 +61,7 @@ figure(1);
 
         % norms(iter) = norm(recon-prev_recon,2);
         % errors(iter) = norm(recon - img,2);
-imagesc(full(reshape(recon,N,N))); title(sprintf('%i, %i',iter,iterations)); pause(0.00001);
+imshow(full(reshape(recon,N,N)),'InitialMagnification','fit'); title(sprintf('%i, %i',iter,iterations)); pause(0.00001);
 proj_order = randperm(size(A,1));
     end
 end
