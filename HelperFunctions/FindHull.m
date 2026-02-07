@@ -1,6 +1,8 @@
-function hull = FindHull(sinogram, A, threshold)
-    sinogram = sinogram == 0;
-    % sum up all projection vectors that miss the object
-    miss_counts = sinogram*A;
-    hull = miss_counts>threshold;
+function hull = FindHull(ProblemSetup)
+    hull = zeros(ProblemSetup.N, ProblemSetup.N);
+    [x,y] = meshgrid(1:ProblemSetup.N, 1:ProblemSetup.N);
+    cx = (ProblemSetup.N+1)/2;   % center
+    cy = (ProblemSetup.N+1)/2;
+    hull = ((x - cx).^2 + (y - cy).^2) <= (ProblemSetup.N/2)^2;
+    hull = hull>0;
 end

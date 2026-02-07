@@ -1,7 +1,5 @@
-function A = FormA(ProblemSetup, restriction)
-    if nargin == 1
-        reduce = false;
-    end
+function A = FormA(ProblemSetup)
+
     det_width = ProblemSetup.ssd_tsize;
     det_bins = ProblemSetup.tbins;
     ang_count = ProblemSetup.angle_count;
@@ -48,6 +46,7 @@ function A = FormA(ProblemSetup, restriction)
         end
     end
     A = sparse(rows, cols, vals, det_bins*ang_count, N*N);
+
     % if reduce
     %     for kk = 1:size(A,1)
     %         A(kk,:) = A(kk,:).*restriction;
