@@ -48,11 +48,11 @@ function A = FormA(ProblemSetup, restriction)
         end
     end
     A = sparse(rows, cols, vals, det_bins*ang_count, N*N);
-    if ~reduce
-        for kk = 1:size(A,1)
-            A(kk,:) = A(kk,:).*restriction;
-        end
-    end
+    % if reduce
+    %     for kk = 1:size(A,1)
+    %         A(kk,:) = A(kk,:).*restriction;
+    %     end
+    % end
 end
 
 

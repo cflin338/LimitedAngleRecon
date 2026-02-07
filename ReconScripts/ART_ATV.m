@@ -9,7 +9,7 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
     N                 = ProblemSetup.N;
     thetas            = ProblemSetup.angles; %angles
     bins              = ProblemSetup.tbins;
-    num_angles        = length(ProblemSetup.angles);
+    num_angles        = ProblemSetup.angle_count;
     
     % method specific variables
     recon             = pm_ARTATV.initial;
@@ -17,27 +17,26 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
     alphas            = pm_ARTATV.alphas; %atv directions
     iterations        = pm_ARTATV.iterations;
     lambda            = pm_ARTATV.lambda;
-
+    tvStep = pm_ARTATV.tvStep;
     subA = cell(1,num_angles);
     subP = cell(1,num_angles);
     subV = cell(1,num_angles);
     subW = cell(1,num_angles);
-
+    % figure(2);
     for ang = 1:num_angles
         tmpA = A((ang-1)*bins+1:ang*bins,:);
-        subA{ang} = tmpA((ang-1)*bins+1:ang*bins);
+        subA{ang} = tmpA;
         subP{ang} = projections((ang-1)*bins+1:ang*bins);
-        tmpV = sum(tmpA,1); tmpV = 1./tmpV; tmpV(isinf(tmpV)) = 0; tmpV = spdiags(tmpV); 
+        tmpV = sum(tmpA,1); tmpV = 1./tmpV; tmpV(isinf(tmpV)) = 0; tmpV = spdiags(tmpV, 0, length(tmpV), length(tmpV)); 
         subV{ang} = tmpV;
-        tmpW = sum(tmpA,2); tmpW = 1./tmpW; tmpW(isinf(tmpW)) = 0; tmpW = spdiags(tmpW); 
+        tmpW = sum(tmpA,2); tmpW = 1./tmpW; tmpW(isinf(tmpW)) = 0; tmpW = spdiags(tmpW, 0, length(tmpW), length(tmpW)); 
         subW{ang} = tmpW;
-
     end
     
     recons = zeros(iterations, N*N);
 
     AngleOrder        = randperm(num_angles);
-    
+    figure(1);
     for iter = 1:iterations
         prev_recon = recon;
 
@@ -47,7 +46,17 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
             b_sub = subP{subset};
             W_sub = subW{subset};
             V_sub = subV{subset};
-            recon = recon + lambda * V_sub * A_sub' * W_sub * (b_sub - A_sub * recon);
+
+            
+            
+            % r = b_sub - A_sub*recon;
+            % tmp = W_sub .* r;
+            % tmp = A_sub' * tmp;
+            % tmp = V_sub .* tmp;
+            % 
+            % recon = recon + lambda * tmp;
+
+            recon = recon + lambda .* (V_sub * A_sub' * W_sub * (b_sub - A_sub * recon));
             recon(recon<0) = 0;
         end
         
@@ -58,12 +67,14 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
             % gradient of ATV cost function
             [~,dtv] = grad_ATV(recon, thetas, alphas); %this is humphry's implementation
             dtv = dtv / norm(dtv,2);
-            recon = recon - alpha * d * dtv;
+            recon = recon - tvStep * d * dtv;
         end
         % shuffle angle order
         AngleOrder        = randperm(num_angles);
         % store reconstruction
         recons(iter,:) = recon;
+        imagesc(reshape(recon,N,N));title(iter); pause(0.00001);
+        disp([min(recon), max(recon)])
     end
 
     

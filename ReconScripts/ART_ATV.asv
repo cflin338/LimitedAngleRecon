@@ -9,16 +9,14 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
     N                 = ProblemSetup.N;
     thetas            = ProblemSetup.angles; %angles
     bins              = ProblemSetup.tbins;
-    num_angles        = length(ProblemSetup.angles);
+    num_angles        = ProblemSetup.angle_count;
     
     % method specific variables
     recon             = pm_ARTATV.initial;
     N_tv              = pm_ARTATV.N_tv;
-    alphas            = pm_ARTATV.alphas;
+    alphas            = pm_ARTATV.alphas; %atv directions
     iterations        = pm_ARTATV.iterations;
-    epsilon           = pm_ARTATV.epsilon;
     lambda            = pm_ARTATV.lambda;
-    alpha             = pm_ARTATV.alpha;  %TV directions
 
     subA = cell(1,num_angles);
     subP = cell(1,num_angles);
@@ -36,21 +34,11 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
 
     end
     
-    
     recons = zeros(iterations, N*N);
 
     AngleOrder        = randperm(num_angles);
     
-    D = sum(A,1); D = 1./D; D(isinf(D)) = 0; D = diag(D);
-    M = sum(A,2); M = 1./M; M(isinf(M)) = 0; M = diag(M);
-    
-    W = full(sum(A,2)); 
-    V = full(sum(A,1)); 
     for iter = 1:iterations
-        if disp_prog
-            waitbar((iter-1)/iterations, wb, sprintf('ART-aTV Progress: %i of %i Iterations', ...
-                                                 iter, iterations));
-        end
         prev_recon = recon;
 
         for angle_idx = 1:num_angles
@@ -59,7 +47,7 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
             b_sub = subP{subset};
             W_sub = subW{subset};
             V_sub = subV{subset};
-            recon = recon + lambda * V_sub * A_sub' * W_sub * (b_sub - A_sub * recon);
+            recon = recon + lambda .* (V_sub * A_sub' * W_sub * (b_sub - A_sub * recon));
             recon(recon<0) = 0;
         end
         
@@ -72,13 +60,12 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
             dtv = dtv / norm(dtv,2);
             recon = recon - alpha * d * dtv;
         end
-
+        % shuffle angle order
         AngleOrder        = randperm(num_angles);
+        % store reconstruction
+        recons(iter,:) = recon;
     end
 
-    if disp_prog
-        close(wb);
-    end
     
 end
 
