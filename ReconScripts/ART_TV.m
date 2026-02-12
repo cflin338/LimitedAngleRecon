@@ -29,12 +29,12 @@ figure(1);
         for m = 1:NData
             proj_idx = proj_order(m);
             % basis vector
-            Ai = A(proj_idx,:)'.*hull';
+            Ai = A(proj_idx,:)';%.*hull';
             AiNorm = norm(Ai);
             if AiNorm>0
                 p = projections(proj_idx);
                 recon = recon + lambda*Ai*(p-Ai'*recon)/(AiNorm^2);
-                
+
             end
             
         end
@@ -58,10 +58,10 @@ figure(1);
         end
         
         recons(:, iter) = recon;
-
+imshow(full(reshape(recon,N,N)),'InitialMagnification','fit'); title(sprintf('ART-TV: %i of %i',iter,iterations)); pause(0.00001);
+disp([max(recon), min(recon)]);
         % norms(iter) = norm(recon-prev_recon,2);
         % errors(iter) = norm(recon - img,2);
-imshow(full(reshape(recon,N,N)),'InitialMagnification','fit'); title(sprintf('%i, %i',iter,iterations)); pause(0.00001);
 proj_order = randperm(size(A,1));
     end
 end

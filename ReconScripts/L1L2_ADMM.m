@@ -1,4 +1,4 @@
-function [u,metrics, samples] = L1L2_ADMM(ProblemSetup, pm_L1dL2)
+function [recons] = L1L2_ADMM(ProblemSetup, pm_L1dL2)
     % Limited-angle CT reconstruction via the L1/L2 minimization∗
     %       Rahimi 2019
     % Limited-Angle CT Reconstruction via the $L_1/L_2$ Minimization
@@ -19,17 +19,14 @@ function [u,metrics, samples] = L1L2_ADMM(ProblemSetup, pm_L1dL2)
     % updating u, admm u sub problem, introduce d var
     
     % General Variables
+    PseuTarget = ProblemSetup.PseuTarget;
     A                 = ProblemSetup.A;
     projections       = ProblemSetup.projections;
-    img               = ProblemSetup.img;
+
     N                 = ProblemSetup.N;
-    sample_rate       = pm_L1dL2.sample_rate;
-    % sample_rate       = 1;
-    % variables for monitoring
-    visualize         = pm_L1dL2.visualize;
-    disp_prog         = pm_L1dL2.disp_prog;
     
     % Method Specific Variables
+    
     rho1              = pm_L1dL2.rho1; 
     rho2              = pm_L1dL2.rho2; 
     gamma             = rho1+rho2;
@@ -42,8 +39,6 @@ function [u,metrics, samples] = L1L2_ADMM(ProblemSetup, pm_L1dL2)
     upper_bound       = pm_L1dL2.upper_bound;
     lower_bound       = pm_L1dL2.lower_bound;
     
-    samples        = [];
-
     % initial guess
     u = reshape(pm_L1dL2.initial,[N,N]);
     e = zeros([N,N]); 
@@ -57,24 +52,10 @@ function [u,metrics, samples] = L1L2_ADMM(ProblemSetup, pm_L1dL2)
     hy = zeros([N,N]);
     cx = zeros([N,N]);
     cy = zeros([N,N]);
-    
-    if visualize
-        fig_rows = 1;
-        fig_cols = 2;
-        figure(5); set(gcf, 'units', 'normalized', 'outerposition', [0.25 0.25 .5 .5]);
-        tiledlayout(fig_rows,fig_cols);
-    end
-    
-    errors            = [];
-
-    submetrics = ProblemSetup.empty_sub;
-    submetric_keys = fieldnames(submetrics); % will be used for updating metrics
-    overallmetrics    = [];
-    
+    recons = zeros(N*N, iterations);
+    figure(3); 
     for iter = 1:iterations
-        if disp_prog
-            fprintf("%i of %i iterations \n",iter,iterations); 
-        end
+        disp(iter)
         prev_u = u;
         % update u
         % introduce v for subproblem
@@ -139,36 +120,15 @@ function [u,metrics, samples] = L1L2_ADMM(ProblemSetup, pm_L1dL2)
         cy = cy + Dyu - hy;
 
         stepsize = norm(u-prev_u,'fro')/sqrt(numel(u));
-        errors = [errors, stepsize];
-        [sub, overall] = localized_metric_v2(reshape(img,[N,N]), reshape(u,[N,N]), ...
-                                             ProblemSetup);
-        % 8 total fields, submetrics
-        for metric_idx = 1:length(submetric_keys)
-            submetrics.(submetric_keys{metric_idx}) = [submetrics.(submetric_keys{metric_idx}); ...
-                                                sub.(submetric_keys{metric_idx})];
-        end  
-
-        overallmetrics = [overallmetrics; overall];
         
-        if visualize
-            nexttile(1);
-            imshow(u,[], 'InitialMagnification', 'fit');
-            title('L1/L2 Reconstruction');
-            nexttile(2);
-            plot(errors);
-            title('Exit Criteria'); xlabel('Iterations'); ylabel('Frobenius Norm');
-            pause(.00001);
-        end
-        
+        recons(:,iter) = u(:);
+        imshow(u./max(u(:)),'InitialMagnification','fit'); title(sprintf('L1dL2- %i', iter)); pause(0.001);
+        disp([min(u(:)), max(u(:)), norm(PseuTarget - u(:))])
         if stepsize < outer_epsilon
             break
         end
-        if mod(iter, sample_rate)==0
-            samples = [samples; u(:)'];
-        end
+        
     end
-    metrics.sub = submetrics;
-    metrics.full = overallmetrics;
     
 end
 

@@ -4,13 +4,16 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
     %       SART + ATV
 
     % General Variables
+    PseuTarget = ProblemSetup.PseuTarget;
     A                 = ProblemSetup.A;
     projections       = ProblemSetup.projections;
     N                 = ProblemSetup.N;
     thetas            = ProblemSetup.angles; %angles
     bins              = ProblemSetup.tbins;
     num_angles        = ProblemSetup.angle_count;
-    
+        formatted_proj = reshape(projections, num_angles, bins);
+        sim_b = ProblemSetup.projections_sim;
+        sim_b_formatted = reshape(sim_b, num_angles,bins);
     % method specific variables
     recon             = pm_ARTATV.initial;
     N_tv              = pm_ARTATV.N_tv;
@@ -22,18 +25,26 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
     subP = cell(1,num_angles);
     subV = cell(1,num_angles);
     subW = cell(1,num_angles);
+
+    sim_b = ProblemSetup.projections_sim;
+    subP_sim = cell(1,num_angles);
     % figure(2);
     for ang = 1:num_angles
         tmpA = A((ang-1)*bins+1:ang*bins,:);
+        % for binID = 1:bins
+        %     imagesc(reshape(tmpA(binID,:),N,N)); pause(0.001);
+        % end
         subA{ang} = tmpA;
         subP{ang} = projections((ang-1)*bins+1:ang*bins);
-        tmpV = sum(tmpA,1); tmpV = 1./tmpV; tmpV(isinf(tmpV)) = 0; tmpV = spdiags(tmpV, 0, length(tmpV), length(tmpV)); 
+        subP_sim{ang} = sim_b((ang-1)*bins+1:ang*bins);
+        tmpV = sum(tmpA,1); tmpV = 1./tmpV; tmpV(isinf(tmpV)) = 0; tmpV = sparse(1:length(tmpV), 1:length(tmpV), tmpV, length(tmpV), length(tmpV));
         subV{ang} = tmpV;
-        tmpW = sum(tmpA,2); tmpW = 1./tmpW; tmpW(isinf(tmpW)) = 0; tmpW = spdiags(tmpW, 0, length(tmpW), length(tmpW)); 
+        tmpW = sum(tmpA,2); tmpW = 1./tmpW; tmpW(isinf(tmpW)) = 0; tmpW = sparse(1:length(tmpW), 1:length(tmpW), tmpW, length(tmpW), length(tmpW)); 
         subW{ang} = tmpW;
+        % imagesc(reshape(sum(tmpA,1),N,N)); title(ang); pause(0.0001); 
     end
     
-    recons = zeros(iterations, N*N);
+    recons = zeros(N*N, iterations);
 
     AngleOrder        = randperm(num_angles);
     figure(1);
@@ -47,17 +58,10 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
             W_sub = subW{subset};
             V_sub = subV{subset};
 
-            
-            
-            % r = b_sub - A_sub*recon;
-            % tmp = W_sub .* r;
-            % tmp = A_sub' * tmp;
-            % tmp = V_sub .* tmp;
-            % 
-            % recon = recon + lambda * tmp;
-
             recon = recon + lambda .* (V_sub * A_sub' * W_sub * (b_sub - A_sub * recon));
             recon(recon<0) = 0;
+            
+            % imagesc(full(reshape(recon,N,N))); title(angle_idx); pause(0.0001);
         end
         
         % ATV gradient descent
@@ -68,13 +72,24 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
             [~,dtv] = grad_ATV(recon, thetas, alphas); %this is humphry's implementation
             dtv = dtv / norm(dtv,2);
             recon = recon - tvStep * d * dtv;
+            % imshow(full(reshape(recon,N,N)), 'InitialMagnification','fit'); title(angle_idx); pause(0.0001);
         end
+
+        % ------------
+% epsilon = 0.1; grad_desc_size = d; alpha = 0.6;
+% for n = 1:N_tv
+% v = dTV(recon,N,epsilon);
+% v = v/norm(v);
+% recon = recon-alpha*grad_desc_size*v;
+% % imagesc(full(reshape(recon,N,N))); title(n); pause(0.0001);
+% end
+        % ------------
         % shuffle angle order
         AngleOrder        = randperm(num_angles);
         % store reconstruction
-        recons(iter,:) = recon;
-        imagesc(reshape(recon,N,N));title(iter); pause(0.00001);
-        disp([min(recon), max(recon)])
+        recons(:,iter) = recon';
+        imshow(full(reshape(recon,N,N)./max(recon)), 'InitialMagnification','fit'); title(iter); pause(0.0001);
+        disp([min(recon), max(recon), norm(PseuTarget - recon)])
     end
 
     
@@ -291,4 +306,21 @@ function [omega] = compute_omega(thetas, alpha)
         
         omega = omega + abs(sin(alpha*pi/180 - br_theta*pi/180));
     end    
+end
+
+
+
+function v = dTV(f, n, epsilon)
+    % gradient of TV cost function, from paper
+    f = reshape(f, [n,n]);
+    v = zeros(n,n);
+    for s = 2:size(f,1)-1
+        for t = 2:size(f,2)-1
+            v(s,t) = (2*(f(s,t)-f(s-1,t))+2*(f(s,t)-f(s,t-1))) / ...
+                    sqrt(epsilon + (f(s,t)-f(s-1,t))^2+(f(s,t)-f(s,t-1))^2) - ...
+                    2*(f(s+1,t)-f(s,t))/sqrt(epsilon+(f(s+1,t)-f(s,t))^2+(f(s+1,t)-f(s+1,t-1))^2) - ...
+                    2*(f(s,t+1)-f(s,t))/sqrt(epsilon+(f(s,t+1)-f(s,t))^2+(f(s,t+1)-f(s-1,t+1))^2);
+        end
+    end
+    v = v(:);
 end

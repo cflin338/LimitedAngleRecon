@@ -1,55 +1,70 @@
 %% Testing on existing pCT data
 % problem setup
-% close all;
-% clc;clear;
+close all;
+clc;clear;
 
-addpath("data/", "HelperFunctions/", "ReconScripts/");
 run("LoadProblemSetup.m")
 
-[sinogram,sinogram_slice] = read_pct_sinogram('data/pct_sinogram.txt', ...
-    ProblemSetup.vbins, ProblemSetup.tbins, ProblemSetup.angle_count, ProblemSetup.target_slice);
-% % hull = findHull(sinogram, angles);
-% hull = FindHull(sinogram, projections, 100);
+% hull = FindHull(ProblemSetup);
 
-if size(sinogram,1)~=ProblemSetup.angle_count * ProblemSetup.vbins || ...
-        size(sinogram,2)~=ProblemSetup.tbins
-    disp('mismatch of sinogram')
-    return;
-end
+figure(3);
+tiledlayout(1,2); nexttile(1); imagesc(reshape(simulated_sino, 350,360));
+nexttile(2); imagesc(flip(sinogram_slice,2)');
 
-desired_angles = 1:ProblemSetup.angle_count;
-remove_angles = 60:120;
-angle_subset = desired_angles; desired_angles(remove_angles) = [];
-tic;
-A = FormA(ProblemSetup);
-toc;
+hull = FindHull(ProblemSetup);
+hull = hull(:)';
 
 % verification
-sinogram_slice_flat = sinogram_slice(:);
+sinogram_slice_flat = reformatted_sinogram_slice(:);
 
 As = sum(A,2);
 disp(sum((As==0) & (sinogram_slice_flat>0)));
 
-ProblemSetup.projections = sinogram_slice_flat;
+ProblemSetup.projections = reformatted_sinogram_slice;
+ 
+ProblemSetup.projections_sim = simulated_sino;
+
+ProblemSetup.PseuTarget = reconx30_slice(:);
+
 ProblemSetup.A = A;
-pm_ARTTV.Iterations = 10;
+ProblemSetup.hull = hull;
+% 
+pm_ARTTV.Iterations = 5;
 pm_ARTTV.GradDescSteps = 30;
 pm_ARTTV.initial = zeros(ProblemSetup.N*ProblemSetup.N,1);
-pm_ARTTV.lambda = 5; %?? too big? 
+
+pm_ARTTV.lambda = 0.0003; %?? too big? 
 pm_ARTTV.alpha = 0.6;
 pm_ARTTV.epsilon = 0.1;
 
-% tic; recons = ART_TV(ProblemSetup, pm_ARTTV); toc;
+tic; arttv_recons = ART_TV(ProblemSetup, pm_ARTTV); toc;
     
 
-
 pm_ARTATV.initial = zeros(ProblemSetup.N*ProblemSetup.N, 1);
-pm_ARTATV.N_tv = 20;
-pm_ARTATV.alphas = linspace(0,2*pi, 9); pm_ARTATV.alphas(end) = []; 
+pm_ARTATV.N_tv = 3;
+pm_ARTATV.alphas = linspace(0,2*pi, 8+1); pm_ARTATV.alphas(end) = []; 
         %use N_alpha=8, so 8 angles within valid scan range
-pm_ARTATV.iterations = 100;
+pm_ARTATV.iterations = 400;
 pm_ARTATV.epsilon = .1; 
-pm_ARTATV.lambda = .8;
-pm_ARTATV.tvStep = 0.05;
+pm_ARTATV.lambda = .0003;
+pm_ARTATV.tvStep = 0.00005;
 ProblemSetup.angles = linspace(0,2*pi, ProblemSetup.angle_count+1); ProblemSetup.angles(end) = [];
-recons = ART_ATV(ProblemSetup, pm_ARTATV);
+
+tic; artatv_recons = SART_ATV(ProblemSetup, pm_ARTATV); toc;
+
+
+% these settings result in minimum error @ iter=15
+pm_L1dL2.rho1 = 10; 
+pm_L1dL2.rho2 = 1; 
+
+pm_L1dL2.beta = 10; 
+pm_L1dL2.lambda = .5; 
+pm_L1dL2.maxit = 15; 
+pm_L1dL2.Imaxit = 5; 
+pm_L1dL2.Itol = 1e-4; 
+pm_L1dL2.tol = 1e-5;
+pm_L1dL2.upper_bound = 2;
+pm_L1dL2.lower_bound = 0;
+pm_L1dL2.initial = zeros(N*N,1);
+
+tic; l1dl2_recons = L1L2_ADMM(ProblemSetup, pm_L1dL2); toc;
