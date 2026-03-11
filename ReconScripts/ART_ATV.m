@@ -90,8 +90,9 @@ function recons = ART_ATV(ProblemSetup, pm_ARTATV)
         recons(:,iter) = recon';
         imshow(full(reshape(recon,N,N)./max(recon)), 'InitialMagnification','fit'); title(iter); pause(0.0001);
         disp([min(recon), max(recon), norm(PseuTarget - recon)])
-    end
 
+    end
+    
     
 end
 

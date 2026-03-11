@@ -1,5 +1,6 @@
 % loading in generic variables 
 addpath("data/", "HelperFunctions/", "ReconScripts/");
+ProblemSetup.scan = 'full';
 
 seed = 1; rng(seed); 
 

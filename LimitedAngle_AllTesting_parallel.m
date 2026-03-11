@@ -29,12 +29,12 @@ ProblemSetup.PseuTarget = reconx30_slice(:);
 ProblemSetup.A = A;
 ProblemSetup.hull = hull;
 % 
-pm_ARTTV.Iterations = 30;
+pm_ARTTV.Iterations = 100;
 pm_ARTTV.GradDescSteps = 5;
 pm_ARTTV.initial = zeros(ProblemSetup.N*ProblemSetup.N,1);
 
-pm_ARTTV.lambda = 0.0003; %?? too big? 
-pm_ARTTV.alpha = 0.6;
+pm_ARTTV.lambda = 0.0005; %?? too big? 
+pm_ARTTV.alpha = 0.5;
 pm_ARTTV.epsilon = 0.1;
 
 tic; arttv_recons = ART_TV(ProblemSetup, pm_ARTTV); toc;

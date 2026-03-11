@@ -123,11 +123,14 @@ function [recons] = L1L2_ADMM(ProblemSetup, pm_L1dL2)
         
         recons(:,iter) = u(:);
         imshow(u./max(u(:)),'InitialMagnification','fit'); title(sprintf('L1dL2- %i', iter)); pause(0.001);
-        disp([min(u(:)), max(u(:)), norm(PseuTarget - u(:))])
+        disp([min(u(:)), max(u(:)), norm(PseuTarget - u(:)), norm(prev_u(:) - u(:))])
         if stepsize < outer_epsilon
             break
         end
         
+    end
+    if iter < iterations
+        recons(:,iter+1:end) = [];
     end
     
 end

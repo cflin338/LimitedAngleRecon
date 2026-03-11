@@ -8,40 +8,33 @@ function recons = SART_ATV(ProblemSetup, pm_ARTATV)
     A                 = ProblemSetup.A;
     projections       = ProblemSetup.projections;
     N                 = ProblemSetup.N;
-    thetas            = ProblemSetup.angles; %angles
+    thetas            = ProblemSetup.angles; 
     bins              = ProblemSetup.tbins;
     num_angles        = ProblemSetup.angle_count;
-        formatted_proj = reshape(projections, num_angles, bins);
-        sim_b = ProblemSetup.projections_sim;
-        sim_b_formatted = reshape(sim_b, num_angles,bins);
+    hull              = ProblemSetup.hull(:)';
+
     % method specific variables
     recon             = pm_ARTATV.initial;
     N_tv              = pm_ARTATV.N_tv;
     alphas            = pm_ARTATV.alphas; %atv directions
     iterations        = pm_ARTATV.iterations;
     lambda            = pm_ARTATV.lambda;
-    tvStep = pm_ARTATV.tvStep;
+    tvStep            = pm_ARTATV.tvStep;
+    epsilon           = pm_ARTATV.epsilon;
+
     subA = cell(1,num_angles);
     subP = cell(1,num_angles);
     subV = cell(1,num_angles);
     subW = cell(1,num_angles);
-
-    sim_b = ProblemSetup.projections_sim;
-    subP_sim = cell(1,num_angles);
-    figure(2);
+    
     for ang = 1:num_angles
-        tmpA = A((ang-1)*bins+1:ang*bins,:);
-        % for binID = 1:bins
-        %     imagesc(reshape(tmpA(binID,:),N,N)); pause(0.001);
-        % end
+        tmpA = A((ang-1)*bins+1:ang*bins,:).*hull;
         subA{ang} = tmpA;
         subP{ang} = projections((ang-1)*bins+1:ang*bins);
-        subP_sim{ang} = sim_b((ang-1)*bins+1:ang*bins);
         tmpV = sum(tmpA,1); tmpV = 1./tmpV; tmpV(isinf(tmpV)) = 0; tmpV = sparse(1:length(tmpV), 1:length(tmpV), tmpV, length(tmpV), length(tmpV));
         subV{ang} = tmpV;
         tmpW = sum(tmpA,2); tmpW = 1./tmpW; tmpW(isinf(tmpW)) = 0; tmpW = sparse(1:length(tmpW), 1:length(tmpW), tmpW, length(tmpW), length(tmpW)); 
         subW{ang} = tmpW;
-        % imagesc(reshape(sum(tmpA,1),N,N)); title(ang); pause(0.0001); 
     end
     
     recons = zeros(N*N, iterations);
@@ -60,19 +53,18 @@ function recons = SART_ATV(ProblemSetup, pm_ARTATV)
 
             recon = recon + lambda .* (V_sub * A_sub' * W_sub * (b_sub - A_sub * recon));
             recon(recon<0) = 0;
-            
-            % imagesc(full(reshape(recon,N,N))); title(angle_idx); pause(0.0001);
+            recon(recon>3) = 3;
         end
         
         % ATV gradient descent
         d = norm(recon-prev_recon,2);
          
-        for n = 1:N_tv
+        for n = 1:N_tv%*(iter>iterations-10)
             % gradient of ATV cost function
-            [~,dtv] = grad_ATV(recon, thetas, alphas); %this is humphry's implementation
+            [~,dtv] = grad_ATV(recon, thetas, alphas, epsilon); 
             dtv = dtv / norm(dtv,2);
             recon = recon - tvStep * d * dtv;
-            % imshow(full(reshape(recon,N,N)), 'InitialMagnification','fit'); title(angle_idx); pause(0.0001);
+
         end
 
         % shuffle angle order
@@ -80,10 +72,9 @@ function recons = SART_ATV(ProblemSetup, pm_ARTATV)
         % store reconstruction
         recons(:,iter) = recon';
         imshow(full(reshape(recon,N,N)./max(recon)), 'InitialMagnification','fit'); title(sprintf('SART-ATV, %i', iter)); pause(0.0001);
-        disp([min(recon), max(recon), norm(PseuTarget - recon)])
+        disp([min(recon), max(recon), norm(PseuTarget - recon), norm(recon-prev_recon)])
     end
 
-    
 end
 
 
@@ -117,11 +108,8 @@ end
 w = w/norm(w,2);
 end
 
-
-function [TV,dTV] = grad_ATV(f, thetas, alphas)
+function [TV,dTV] = grad_ATV(f, thetas, alphas, epsilon)
 % https://github.com/TDHumphries/PSARTSUP/blob/6bf966ae29561322baacbaa36de7da95f0646832/core/reconstruction/grad_ATV.m
-    epsilon = 1e-6;
-
     [m, n] = size(f);
     TV = 0;
     dTV = zeros(size(f));
@@ -161,23 +149,30 @@ function [TV,dTV] = grad_ATV(f, thetas, alphas)
         diffy_2 = f(ind_m1, ind_n1) - f(ind_m1, ind_n0);
         
         %dot product
-        diff_1 = e_alpha_x*diffx_1 + e_alpha_y*diffy_1 + epsilon;
-        diff_0 = e_alpha_x*diffx_0 + e_alpha_y*diffy_0 + epsilon;
-        diff_2 = e_alpha_x*diffx_2 + e_alpha_y*diffy_2 + epsilon;        
-        
+        % diff_1 = e_alpha_x*diffx_1 + e_alpha_y*diffy_1 + epsilon;
+        % diff_0 = e_alpha_x*diffx_0 + e_alpha_y*diffy_0 + epsilon;
+        % diff_2 = e_alpha_x*diffx_2 + e_alpha_y*diffy_2 + epsilon;        
+diff_1 = e_alpha_x*diffx_1 + e_alpha_y*diffy_1;
+diffttl_1 = sqrt(diff_1.^2 + epsilon);
+diff_0 = e_alpha_x*diffx_0 + e_alpha_y*diffy_0 ;
+diffttl_0 = sqrt(diff_0.^2 + epsilon);
+diff_2 = e_alpha_x*diffx_2 + e_alpha_y*diffy_2 ; 
+diffttl_2 = sqrt(diff_2.^2 + epsilon);
         %norm of the above
-        diffttl_1 = abs(diff_1);
-        diffttl_0 = abs(diff_0);
-        diffttl_2 = abs(diff_2);
+        % diffttl_1 = abs(diff_1);
+        % diffttl_0 = abs(diff_0);
+        % diffttl_2 = abs(diff_2);
         
         
         TV = TV + (omega * sum(sum(diffttl_1)));
         
         %gradient calculation
-        alpha_i_dTV = ( (1./diffttl_1) .* (diff_1) * (-e_alpha_x - e_alpha_y) ) + ...
-                      ( (1./diffttl_0) .* (diff_0) * e_alpha_x ) + ...
-                      ( (1./diffttl_2) .* (diff_2) * e_alpha_y );
-
+        % alpha_i_dTV = ( (1./diffttl_1) .* (diff_1) * (-e_alpha_x - e_alpha_y) ) + ...
+        %               ( (1./diffttl_0) .* (diff_0) * e_alpha_x ) + ...
+        %               ( (1./diffttl_2) .* (diff_2) * e_alpha_y );
+alpha_i_dTV = ((diff_1 ./ diffttl_1) .* (-e_alpha_x - e_alpha_y)) + ...
+              ((diff_0 ./ diffttl_0) .* e_alpha_x) + ...
+              ((diff_2 ./ diffttl_2) .* e_alpha_y);
 
         dTV = dTV + (omega * alpha_i_dTV);        
     end    
@@ -314,4 +309,22 @@ function v = dTV(f, n, epsilon)
         end
     end
     v = v(:);
+end
+
+function [TV,dTV] = grad_TV(f, n, epsilon)
+f = reshape(f,n,n);
+m=n;
+%create indices in x and y directions, offset by 1 in either direction
+ind_m1 = 1:m; ind_n1 = 1:n;
+ind_m2 = [2:m 1]; ind_n2 = [2:n 1];         %assumes periodic BCs which should be ok if support is compact
+ind_m0 = [m 1:m-1]; ind_n0 = [n 1:n-1];
+diff1 = (f(ind_m2,ind_n1)-f(ind_m1,ind_n1)).^2; %difference in y-direction
+diff2 = (f(ind_m1,ind_n2)-f(ind_m1,ind_n1)).^2; %difference in x-direction
+diffttl = sqrt(diff1+diff2+epsilon^2);          %gradient norm in every pixel
+TV = sum(sum(abs(diffttl)));
+
+dTV = -1./diffttl .* (f(ind_m2,ind_n1)-2*f(ind_m1,ind_n1)+f(ind_m1,ind_n2)) + ...
+        1./diffttl(ind_m0,ind_n1) .* (f(ind_m1,ind_n1)-f(ind_m0,ind_n1)) + ...
+        1./diffttl(ind_m1,ind_n0) .* (f(ind_m1,ind_n1)-f(ind_m1,ind_n0));       %gradient of TV
+dTV = dTV(:);
 end
